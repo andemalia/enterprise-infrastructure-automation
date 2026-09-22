@@ -1,0 +1,37 @@
+---
+- name: Distributed Security Compliance & Network Audit
+  hosts: linux_servers
+  become: yes
+  vars:
+    local_script_path: "./security_audit.sh"
+    remote_script_path: "/tmp/security_audit.sh"
+    fetch_log_destination: "./fetched_logs/"
+
+  tasks:
+    - name: 1. Ensure security audit script is deployed to target node
+      ansible.builtin.copy:
+        src: "{{ local_script_path }}"
+        dest: "{{ remote_script_path }}"
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: 2. Execute automated network and system audit
+      ansible.builtin.command: "{{ remote_script_path }}"
+      register: audit_execution_output
+      changed_when: true
+
+    - name: 3. Display execution confirmation from remote endpoint
+      ansible.builtin.debug:
+        msg: "{{ audit_execution_output.stdout_lines }}"
+
+    - name: 4. Securely harvest generated audit logs back to management control center
+      ansible.builtin.fetch:
+        src: "/var/log/system_security_audit.log"
+        dest: "{{ fetch_log_destination }}/{{ inventory_hostname }}_security_report.log"
+        flat: yes
+
+    - name: 5. Securely remove temporary script execution binary from remote space
+      ansible.builtin.file:
+        path: "{{ remote_script_path }}"
+        state: absent
